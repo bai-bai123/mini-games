@@ -35,15 +35,17 @@ window.addEventListener("resize",resize);
 // 怪物(简单形状)
 let mhp=100,mx=0,my=0,flash=0,shake=0;
 // 角色动画状态
-let frame=0,animT=0,attacking=false,atkCount=0;
+let frame=0,animT=0,attacking=false,atkPhase=0;
 let lastT=performance.now();
 function draw(){
   const now=performance.now();const dt=Math.min(50,now-lastT);lastT=now;
   // 攻击动画:每100ms切一帧,共4帧(两图各2次)
   if(attacking){
     animT+=dt;
-    if(animT>=100){animT-=100;frame=(frame+1)%2;atkCount++;}
-    if(atkCount>=4){attacking=false;atkCount=0;}
+    if(animT>=120){animT-=120;atkPhase++;}
+    if(atkPhase==0){frame=1;}        // 挥出(图2)
+    else if(atkPhase==1){frame=0;}   // 收回(图1)
+    else{attacking=false;atkPhase=0;frame=0;} // 结束
   }
   // 受击特效衰减
   if(flash>0)flash-=dt;if(shake>0)shake-=dt;
@@ -78,7 +80,7 @@ function draw(){
 }
 // 攻击
 function attack(){
-  if(!attacking){attacking=true;animT=0;frame=0;atkCount=0;}
+  if(!attacking){attacking=true;animT=0;frame=0;atkPhase=0;}
   mhp=Math.max(0,mhp-25);flash=150;shake=120;
   if(mhp<=0){mhp=100;}
 }
