@@ -35,15 +35,26 @@ window.addEventListener("resize",resize);
 let mhp=100,mx=0,my=0,flash=0,shake=0;
 // 角色动画状态
 let frame=0,animT=0,attacking=false,atkPhase=0;
+const DUR=[100,40,40,100,40,80];        // 每帧时长ms:蓄力/下挥/横斩/命中/收招/归位
+let hitStop=0,hitLock=false,parts=[];   // 命中停顿 / 命中锁 / 粒子
 let lastT=performance.now();
 function draw(){
-  const now=performance.now();const dt=Math.min(50,now-lastT);lastT=now;
-  // 攻击动画:每100ms切一帧,共4帧(两图各2次)
+  const now=performance.now();let dt=Math.min(50,now-lastT);lastT=now;
+  // 命中停顿:命中瞬间时间减速(类似 Time.timeScale=0.1)
+  if(hitStop>0){hitStop-=dt;dt*=0.15;}
+  // 攻击动画:帧时长不均匀,命中帧最长
   if(attacking){
     animT+=dt;
-    if(animT>=70){animT-=70;atkPhase++;}
-    if(atkPhase<6){frame=atkPhase;}                          // 帧0-5 循环播放
-    else{attacking=false;atkPhase=0;frame=0;}               // 结束回到待机
+    if(animT>=DUR[atkPhase]){
+      animT-=DUR[atkPhase];atkPhase++;
+      if(atkPhase===3&&!hitLock){              // 进入命中帧
+        hitLock=true;hitStop=150;              // 冻结动画
+        for(let i=0;i<10;i++){const a=Math.random()*6.28,v=2+Math.random()*5;
+          parts.push({x:mx,y:my,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:350+Math.random()*300,c:Math.random()<.5?"#ffd34d":"#fff"});}
+      }
+      if(atkPhase>=6){attacking=false;atkPhase=0;animT=0;hitLock=false;frame=0;}
+      else{frame=atkPhase;}
+    }
   }
   // 受击特效衰减
   if(flash>0)flash-=dt;if(shake>0)shake-=dt;
@@ -69,19 +80,50 @@ function draw(){
   ctx.fillStyle="#e74c3c";ctx.fillRect(mx-55,my-70,110*mhp/100,10);
   ctx.fillStyle="#fff";ctx.font="12px system-ui";ctx.textAlign="center";
   ctx.fillText("史莱姆",mx,my-78);
-  // 角色(两帧图)
+  // 角色(6帧雪碧图)
   const size=Math.min(280,W*0.55);
-  let shakeX=attacking?(Math.random()*4-2):0;
   const FW=512,FH=768,COLS=3;
   const ch=size, cw=ch*FW/FH;             // 保持 512:768 比例
   const fx=(frame%COLS)*FW, fy=Math.floor(frame/COLS)*FH;
-  ctx.drawImage(imgs[0],fx,fy,FW,FH,mx-W*0.42-cw/2,my+90-ch,cw,ch);
+  const px=mx-W*0.42-cw/2, py=my+90-ch;
+  // 残影:挥动阶段叠加2层半透明偏移帧
+  if(attacking&&atkPhase>=1&&atkPhase<=3){
+    for(let i=2;i>=1;i--){
+      ctx.globalAlpha=0.2-0.07*i;
+      ctx.drawImage(imgs[0],fx,fy,FW,FH,px-i*5,py,cw,ch);
+    }
+    ctx.globalAlpha=1;
+  }
+  // 斩击弧线:命中帧在怪物位置画出白/金色弧
+  if(attacking&&atkPhase===3){
+    ctx.strokeStyle="rgba(255,255,255,.9)";
+    ctx.lineWidth=6;
+    ctx.beginPath();ctx.arc(mx,my+10,95,-1.2,1.2);ctx.stroke();
+    ctx.strokeStyle="rgba(255,211,77,.5)";
+    ctx.lineWidth=11;
+    ctx.beginPath();ctx.arc(mx,my+10,95,-1.2,1.2);ctx.stroke();
+  }
+  ctx.drawImage(imgs[0],fx,fy,FW,FH,px,py,cw,ch);
+  // 命中粒子
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.12;p.life-=dt;
+    if(p.life<=0){parts.splice(i,1);continue;}
+    ctx.globalAlpha=Math.max(0,p.life/400);
+    ctx.fillStyle=p.c;
+    ctx.fillRect(p.x-2,p.y-2,4,4);
+  }
+  ctx.globalAlpha=1;
   ctx.restore();
   requestAnimationFrame(draw);
 }
 // 攻击
 function attack(){
-  if(!attacking){attacking=true;animT=0;frame=0;atkPhase=0;}
+  if(attacking){
+    if(atkPhase===5){atkPhase=0;animT=0;frame=0;hitLock=false;hitStop=0;}  // 归位帧可连击
+    return;
+  }
+  attacking=true;animT=0;frame=0;atkPhase=0;hitLock=false;hitStop=0;
   mhp=Math.max(0,mhp-25);flash=150;shake=120;
   if(mhp<=0){mhp=100;}
 }
