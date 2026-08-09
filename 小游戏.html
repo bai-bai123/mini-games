@@ -35,7 +35,7 @@ window.addEventListener("resize",resize);
 let mhp=100,mx=0,my=0,flash=0,shake=0;
 // 角色动画状态
 let frame=0,animT=0,attacking=false,atkPhase=0;
-const DUR=[120,80,70,120,80,90];        // 每帧时长ms:蓄力/下挥/横斩/命中/收招/归位
+const DUR=[200,130,110,220,130,150];   // 每帧时长ms:蓄力/下挥/横斩/命中/收招/归位 总940ms
 let hitStop=0,hitLock=false,parts=[];   // 命中停顿 / 命中锁 / 粒子
 let lastT=performance.now();
 function draw(){
@@ -48,7 +48,7 @@ function draw(){
     if(animT>=DUR[atkPhase]){
       animT-=DUR[atkPhase];atkPhase++;
       if(atkPhase===3&&!hitLock){              // 进入命中帧
-        hitLock=true;hitStop=80;               // 命中冻结(缩短,不再独大)
+        hitLock=true;hitStop=60;               // 命中冻结(短,保留打击感)
         for(let i=0;i<10;i++){const a=Math.random()*6.28,v=2+Math.random()*5;
           parts.push({x:mx,y:my,vx:Math.cos(a)*v,vy:Math.sin(a)*v-2,life:350+Math.random()*300,c:Math.random()<.5?"#ffd34d":"#fff"});}
       }
