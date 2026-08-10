@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>角色攻击演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #3a8a3a;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .stage {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  /* 容器宽高比 2:3（512:768），保持帧不拉伸 */
+  .character {
+    width: 36vmin;          /* 高度 = 36 * 3/2 = 54vmin */
+    height: 54vmin;
+    object-fit: contain;    /* 防止图片超出容器 */
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .hint {
+    position: fixed;
+    bottom: 24px; left: 50%; transform: translateX(-50%);
+    color: #e8f5e8; font-size: 14px; opacity: 0.85;
+    text-align: center; line-height: 1.6;
+    pointer-events: none;
+  }
+  .btn {
+    margin-top: 24px;
+    padding: 14px 36px;
+    background: #fff;
+    color: #2a6a2a;
+    border: none; border-radius: 999px;
+    font-size: 16px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+  .btn:active { transform: scale(0.96); }
+  .combo-hud {
+    margin-top: 16px;
+    color: #fff; font-size: 13px; opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <img class="character" id="char" src="frame_1.png" alt="character">
+    <button class="btn" id="atkBtn">⚔ 攻击 (空格)</button>
+    <div class="combo-hud" id="combo">连击: 0</div>
+    <div class="hint">按 [空格] 或 [J] 攻击<br>连续攻击从第 2 帧开始循环</div>
+  </div>
+
+<script>
+(function(){
+  // 6 张独立帧的 src（预切好的 PNG，3x2 网格顺序：1~6 = 左上→右上→左下→右下）
+  const FRAMES = [
+    'frame_1.png',  // 1 举剑准备
+    'frame_2.png',  // 2 蓄力
+    'frame_3.png',  // 3 挥剑（命中）
+    'frame_4.png',  // 4 收剑中
+    'frame_5.png',  // 5 收剑完成
+    'frame_6.png'   // 6 站定
+  ];
+
+  // 节奏方案：6快→1慢→2稍慢→3快→4稍慢→5慢，总时长 2000ms
+  // 用 1~6 表示图片序号，dur = 该帧停留时长
+  const SEQUENCE = [
+    { idx: 6, dur: 200 },  // 6（蓄力快闪）
+    { idx: 1, dur: 400 },  // 1（出剑慢）
+    { idx: 2, dur: 350 },  // 2（挥剑稍慢）
+    { idx: 3, dur: 200 },  // 3（命中快）
+    { idx: 4, dur: 350 },  // 4（收招稍慢）
+    { idx: 5, dur: 500 }   // 5（完全收招慢）
+  ];
+  // 连击时跳过第 6 张（idx=6），从 1 开始循环 1→2→3→4→5
+  const COMBO_SEQUENCE = SEQUENCE.slice(1);
+
+  const charEl = document.getElementById('char');
+  const btnEl  = document.getElementById('atkBtn');
+  const comboEl = document.getElementById('combo');
+
+  let timers = [];
+  let firstAttack = true;   // 是否首次攻击（决定要不要播第6张）
+  let combo = 0;
+
+  function clearTimers() {
+    timers.forEach(t => clearTimeout(t));
+    timers = [];
+  }
+
+  function showFrame(n) {
+    // n 是图片序号 1~6，对应数组下标 n-1
+    charEl.src = FRAMES[n - 1];
+  }
+
+  function playAttack() {
+    clearTimers();
+    combo++;
+    comboEl.textContent = `连击: ${combo}`;
+
+    const seq = firstAttack ? SEQUENCE : COMBO_SEQUENCE;
+    firstAttack = false;
+
+    // 立即显示第一帧
+    showFrame(seq[0].idx);
+
+    let acc = 0;
+    for (let i = 0; i < seq.length; i++) {
+      acc += seq[i].dur;
+      const t = setTimeout(() => {
+        if (i + 1 < seq.length) {
+          showFrame(seq[i + 1].idx);
+        }
+      }, acc);
+      timers.push(t);
+    }
+
+    // 攻击结束 → 回到站姿（帧 1）
+    const endT = setTimeout(() => {
+      showFrame(1);
+    }, acc + 50);
+    timers.push(endT);
+  }
+
+  // 键盘控制
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'KeyJ') {
+      e.preventDefault();
+      playAttack();
+    }
+  });
+
+  // 按钮控制
+  btnEl.addEventListener('click', playAttack);
+
+  // 初始显示站姿
+  showFrame(1);
+})();
+</script>
+</body>
+</html>
