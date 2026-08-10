@@ -44,71 +44,119 @@ FRAMES_B64.forEach((b64, i) => {
   imgs.push(im);
 });
 
-const FRAME_MS = 200;             // 每帧 200ms(简单均匀)
-const TOTAL_FRAMES = 6;
+const FRAME_MS = 200;
 let W = 0, H = 0;
-function resize() {
+// 缓存布局参数
+let layout = { dx: 0, dy: 0, dw: 0, dh: 0 };
+// 离屏画布(预渲染帧)
+let preRendered = [];
+let needRender = false;
+let lastFrame = -2;
+
+function computeLayout() {
   const r = cv.getBoundingClientRect();
   const d = window.devicePixelRatio || 1;
   W = r.width; H = r.height;
   cv.width = W * d; cv.height = H * d;
   ctx.setTransform(d, 0, 0, d, 0, 0);
+  const maxH = H * 0.85;
+  const maxW = W * 0.85;
+  const aspect = 256 / 384;
+  let dh = maxH, dw = dh * aspect;
+  if (dw > maxW) { dw = maxW; dh = dw / aspect; }
+  layout = {
+    dx: (W - dw) / 2,
+    dy: (H - dh) / 2 - 20,
+    dw: dw, dh: dh
+  };
+  prerenderFrames();
+  needRender = true;
 }
-window.addEventListener('resize', resize);
 
-// 状态:仅用绝对时间戳判断帧切换,无 dt 累积
-let frame = -1;        // -1=待机(显示帧0,无数字)
-let attackStart = 0;   // 上一次攻击开始时间戳
+function prerenderFrames() {
+  if (loaded < 6) return;
+  preRendered = [];
+  const { dw, dh } = layout;
+  for (let i = 0; i < 6; i++) {
+    const oc = document.createElement('canvas');
+    oc.width = dw; oc.height = dh;
+    const octx = oc.getContext('2d');
+    octx.drawImage(imgs[i], 0, 0, dw, dh);
+    preRendered.push(oc);
+  }
+}
+
+window.addEventListener('resize', computeLayout);
+
+let frame = -1;
+let attackStart = 0;
+let animId = null;
 
 function attack() {
   attackStart = performance.now();
   frame = 0;
+  needRender = true;
+  if (!animId) loop();
 }
 
-function draw() {
-  // 计算当前帧
+function loop() {
   if (frame >= 0) {
     const elapsed = performance.now() - attackStart;
     const f = Math.floor(elapsed / FRAME_MS);
-    if (f >= TOTAL_FRAMES) {
-      frame = -1;  // 结束回待机
-    } else {
+    if (f >= 6) {
+      frame = -1;
+      needRender = true;
+    } else if (f !== frame) {
       frame = f;
+      needRender = true;
     }
-  }
-
-  // 背景
-  ctx.fillStyle = '#2a2f3a'; ctx.fillRect(0, 0, W, H);
-
-  // 角色:画面正中,保持 256:384 比例
-  const disp = (loaded >= TOTAL_FRAMES) && imgs[0].complete
-             ? imgs[Math.max(0, frame)] : null;
-  if (disp) {
-    const maxH = H * 0.85;
-    const maxW = W * 0.85;
-    const aspect = 256 / 384;
-    let dh = maxH, dw = dh * aspect;
-    if (dw > maxW) { dw = maxW; dh = dw / aspect; }
-    const dx = (W - dw) / 2;
-    const dy = (H - dh) / 2 - 20;  // 略偏上,留按钮空间
-    ctx.drawImage(disp, dx, dy, dw, dh);
   } else {
-    ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('加载中... ' + loaded + '/6', W/2, H/2);
+    animId = null;
+    return;
   }
 
-  // 帧数字标识(右上角大数字,方便调试确认 6 帧都在切换)
-  ctx.fillStyle = 'rgba(255,255,255,.85)';
-  ctx.font = 'bold 28px system-ui';
-  ctx.textAlign = 'right';
-  ctx.fillText(frame >= 0 ? ('帧 ' + (frame+1) + ' / 6') : '待机', W - 16, 36);
+  if (needRender) {
+    needRender = false;
+    lastFrame = frame;
+    ctx.fillStyle = '#2a2f3a'; ctx.fillRect(0, 0, W, H);
+    if (preRendered.length === 6) {
+      ctx.drawImage(preRendered[Math.max(0, frame)], layout.dx, layout.dy);
+    } else if (loaded >= 6 && imgs[0].complete) {
+      ctx.drawImage(imgs[Math.max(0, frame)], layout.dx, layout.dy, layout.dw, layout.dh);
+    } else {
+      ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('加载中... ' + loaded + '/6', W/2, H/2);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 28px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(frame >= 0 ? ('帧 ' + (frame+1) + ' / 6') : '待机', W - 16, 36);
+  }
 
-  requestAnimationFrame(draw);
+  animId = requestAnimationFrame(loop);
 }
 
 btn.addEventListener('touchstart', e => { e.preventDefault(); attack(); });
 btn.addEventListener('mousedown', attack);
-resize();
-requestAnimationFrame(draw);
+// 等待图片加载完后首次渲染
+const waitLoad = setInterval(() => {
+  if (loaded >= 6) {
+    clearInterval(waitLoad);
+    computeLayout();
+    needRender = true;
+    frame = -1;
+    lastFrame = -2;
+    ctx.fillStyle = '#2a2f3a'; ctx.fillRect(0, 0, W, H);
+    if (preRendered.length === 6) {
+      ctx.drawImage(preRendered[0], layout.dx, layout.dy);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 28px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText('待机', W - 16, 36);
+  }
+}, 50);
+
 </script>
-</body></html>
+</body>
+</html>
