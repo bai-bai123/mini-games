@@ -70,6 +70,26 @@
     'frame_6.png'   // 6 站定
   ];
 
+  // ========== 修复：页面加载时预加载全部帧图 ==========
+  // 避免攻击动画开始时才从网络下载图片，弱网/手机浏览器下
+  // 图片加载跟不上帧切换节奏，导致角色看起来不动。
+  const preloaded = FRAMES.map(src => {
+    const img = new Image();
+    img.src = src;
+    return img;
+  });
+  // 切换帧时若图片还没加载完，等它加载完成再切，兜底防跳帧
+  function showFrame(n) {
+    const src = FRAMES[n - 1];
+    const cache = preloaded[n - 1];
+    if (cache && !cache.complete) {
+      cache.onload = () => { if (charEl.src.endsWith(src)) charEl.src = src; };
+      return;
+    }
+    charEl.src = src;
+  }
+  // ==================================================
+
   // 节奏方案：6快→1慢→2稍慢→3快→4稍慢→5慢，总时长 2000ms
   // 用 1~6 表示图片序号，dur = 该帧停留时长
   const SEQUENCE = [
@@ -94,11 +114,6 @@
   function clearTimers() {
     timers.forEach(t => clearTimeout(t));
     timers = [];
-  }
-
-  function showFrame(n) {
-    // n 是图片序号 1~6，对应数组下标 n-1
-    charEl.src = FRAMES[n - 1];
   }
 
   function playAttack() {
