@@ -19,11 +19,14 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
   }
-  /* 容器宽高比 2:3（512:768），保持帧不拉伸 */
+  /* 精灵图：2 行 x 3 列，容器宽高比 2:3，背景图放大到 300% x 200% 切帧 */
   .character {
-    width: 36vmin;          /* 高度 = 36 * 3/2 = 54vmin */
+    width: 36vmin;
     height: 54vmin;
-    object-fit: contain;    /* 防止图片超出容器 */
+    background-image: url(MEITU_20260810_070740175.png);
+    background-repeat: no-repeat;
+    background-size: 300% 200%;
+    background-position: 0% 0%;
     image-rendering: -webkit-optimize-contrast;
   }
   .hint {
@@ -52,7 +55,7 @@
 </head>
 <body>
   <div class="stage">
-    <img class="character" id="char" src="frame_1.png" alt="character">
+    <div class="character" id="char"></div>
     <button class="btn" id="atkBtn">⚔ 攻击 (空格)</button>
     <div class="combo-hud" id="combo">连击: 0</div>
     <div class="hint">按 [空格] 或 [J] 攻击<br>连续攻击从第 2 帧开始循环</div>
@@ -60,38 +63,23 @@
 
 <script>
 (function(){
-  // 6 张独立帧的 src（预切好的 PNG，3x2 网格顺序：1~6 = 左上→右上→左下→右下）
-  const FRAMES = [
-    'frame_1.png',  // 1 举剑准备
-    'frame_2.png',  // 2 蓄力
-    'frame_3.png',  // 3 挥剑（命中）
-    'frame_4.png',  // 4 收剑中
-    'frame_5.png',  // 5 收剑完成
-    'frame_6.png'   // 6 站定
+  const SPRITE = 'MEITU_20260810_070740175.png';
+
+  // 6 帧在精灵图中的位置（2 行 x 3 列，帧序 1~6 = 左上→右上→左下→右下）
+  const POSITIONS = [
+    '0% 0%',      // 1 举剑准备
+    '50% 0%',     // 2 蓄力
+    '100% 0%',    // 3 挥剑（命中）
+    '0% 100%',    // 4 收剑中
+    '50% 100%',   // 5 收剑完成
+    '100% 100%'   // 6 站定
   ];
 
-  // ========== 修复：页面加载时预加载全部帧图 ==========
-  // 避免攻击动画开始时才从网络下载图片，弱网/手机浏览器下
-  // 图片加载跟不上帧切换节奏，导致角色看起来不动。
-  const preloaded = FRAMES.map(src => {
-    const img = new Image();
-    img.src = src;
-    return img;
-  });
-  // 切换帧时若图片还没加载完，等它加载完成再切，兜底防跳帧
-  function showFrame(n) {
-    const src = FRAMES[n - 1];
-    const cache = preloaded[n - 1];
-    if (cache && !cache.complete) {
-      cache.onload = () => { if (charEl.src.endsWith(src)) charEl.src = src; };
-      return;
-    }
-    charEl.src = src;
-  }
-  // ==================================================
+  // 页面加载时预加载精灵图，确保首次攻击立即可用
+  const preloaded = new Image();
+  preloaded.src = SPRITE;
 
   // 节奏方案：6快→1慢→2稍慢→3快→4稍慢→5慢，总时长 2000ms
-  // 用 1~6 表示图片序号，dur = 该帧停留时长
   const SEQUENCE = [
     { idx: 6, dur: 200 },  // 6（蓄力快闪）
     { idx: 1, dur: 400 },  // 1（出剑慢）
@@ -100,7 +88,6 @@
     { idx: 4, dur: 350 },  // 4（收招稍慢）
     { idx: 5, dur: 500 }   // 5（完全收招慢）
   ];
-  // 连击时跳过第 6 张（idx=6），从 1 开始循环 1→2→3→4→5
   const COMBO_SEQUENCE = SEQUENCE.slice(1);
 
   const charEl = document.getElementById('char');
@@ -108,12 +95,16 @@
   const comboEl = document.getElementById('combo');
 
   let timers = [];
-  let firstAttack = true;   // 是否首次攻击（决定要不要播第6张）
+  let firstAttack = true;
   let combo = 0;
 
   function clearTimers() {
     timers.forEach(t => clearTimeout(t));
     timers = [];
+  }
+
+  function showFrame(n) {
+    charEl.style.backgroundPosition = POSITIONS[n - 1];
   }
 
   function playAttack() {
@@ -124,7 +115,6 @@
     const seq = firstAttack ? SEQUENCE : COMBO_SEQUENCE;
     firstAttack = false;
 
-    // 立即显示第一帧
     showFrame(seq[0].idx);
 
     let acc = 0;
@@ -138,7 +128,6 @@
       timers.push(t);
     }
 
-    // 攻击结束 → 回到站姿（帧 1）
     const endT = setTimeout(() => {
       showFrame(1);
     }, acc + 50);
@@ -156,7 +145,7 @@
   // 按钮控制
   btnEl.addEventListener('click', playAttack);
 
-  // 初始显示站姿
+  // 初始显示站姿（帧 1）
   showFrame(1);
 })();
 </script>
