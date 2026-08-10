@@ -19,13 +19,13 @@
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
   }
-  /* 精灵图：1 行 x 4 列，容器宽高比 1:4，背景图放大到 400% x 100% 切帧 */
+  /* 精灵图：3 列 x 2 行，容器宽高比 2:3，背景图放大到 300% x 200% 切帧 */
   .character {
-    width: 18vmin;
-    height: 72vmin;
-    background-image: url(1786347952655.jpg);
+    width: 36vmin;
+    height: 54vmin;
+    background-image: url(sprite_6frames.jpg);
     background-repeat: no-repeat;
-    background-size: 400% 100%;
+    background-size: 300% 200%;
     background-position: 0% 0%;
     image-rendering: -webkit-optimize-contrast;
   }
@@ -63,27 +63,30 @@
 
 <script>
 (function(){
-  const SPRITE = '1786347952655.jpg';
+  const SPRITE = 'sprite_6frames.jpg';
 
-  // 4 帧在精灵图中的位置（1 行 x 4 列，帧序 1~4 = 举剑→蓄力→挥剑→命中）
+  // 6 帧在精灵图中的位置（3 列 x 2 行，行优先，帧序 1~6 = 左上→右上→左下→右下）
   const POSITIONS = [
-    '0% 0%',       // 1 举剑准备
-    '33.33% 0%',   // 2 蓄力
-    '66.66% 0%',   // 3 挥剑中
-    '100% 0%'      // 4 命中爆发
+    '0% 0%',      // 1
+    '50% 0%',     // 2
+    '100% 0%',    // 3
+    '0% 100%',    // 4
+    '50% 100%',   // 5
+    '100% 100%'   // 6
   ];
 
   // 页面加载时预加载精灵图，确保首次攻击立即可用
   const preloaded = new Image();
   preloaded.src = SPRITE;
 
-  // 节奏方案：首帧命中快闪预警 → 举剑慢 → 蓄力稍慢 → 挥剑快 → 命中稍长，总时长 ~1500ms
+  // 节奏方案：举剑慢→蓄力→挥剑快→命中→收招稍慢→站定，总时长 ~2100ms
   const SEQUENCE = [
-    { idx: 4, dur: 150 },  // 4 命中快闪预警
-    { idx: 1, dur: 400 },  // 1 举剑准备
-    { idx: 2, dur: 350 },  // 2 蓄力
-    { idx: 3, dur: 200 },  // 3 挥剑中
-    { idx: 4, dur: 400 }   // 4 命中（持续）
+    { idx: 1, dur: 400 },  // 1
+    { idx: 2, dur: 350 },  // 2
+    { idx: 3, dur: 200 },  // 3 命中
+    { idx: 4, dur: 300 },  // 4 收招
+    { idx: 5, dur: 350 },  // 5 收剑完成
+    { idx: 6, dur: 500 }   // 6 站定
   ];
   const COMBO_SEQUENCE = SEQUENCE.slice(1);
 
