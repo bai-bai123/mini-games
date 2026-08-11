@@ -8,7 +8,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     width: 100%; height: 100%;
-    background: #3a8a3a;
+    background: url(MEITU_20260811_102555772.jpg) center/cover no-repeat;
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
@@ -17,45 +17,72 @@
   .stage {
     position: fixed; inset: 0;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    align-items: center; justify-content: flex-end;
+    padding-bottom: 12vh;
   }
-  /* 精灵图：3 列 x 2 行，容器宽高比 2:3，背景图放大到 300% x 200% 切帧 */
+  /* 角色容器（含阴影） */
+  .char-wrap {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  /* 脚下投影 */
+  .char-shadow {
+    position: absolute;
+    bottom: -2vmin;
+    width: 24vmin;
+    height: 6vmin;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0) 70%);
+    border-radius: 50%;
+    transform: scale(1);
+    transition: transform 0.15s ease;
+  }
+  /* 精灵图：3 列 x 2 行，透明 PNG */
   .character {
     width: 36vmin;
     height: 54vmin;
-    background-image: url(sprite_6frames.jpg);
+    background-image: url(sprite_6frames.png);
     background-repeat: no-repeat;
     background-size: 300% 200%;
     background-position: 0% 0%;
     image-rendering: -webkit-optimize-contrast;
+    position: relative;
+    z-index: 2;
   }
   .hint {
     position: fixed;
-    bottom: 24px; left: 50%; transform: translateX(-50%);
-    color: #e8f5e8; font-size: 14px; opacity: 0.85;
+    bottom: 20px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 14px; opacity: 0.85;
     text-align: center; line-height: 1.6;
     pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
   }
   .btn {
-    margin-top: 24px;
+    margin-top: 20px;
     padding: 14px 36px;
-    background: #fff;
-    color: #2a6a2a;
+    background: rgba(255,255,255,0.92);
+    color: #2a5a7a;
     border: none; border-radius: 999px;
     font-size: 16px; font-weight: 600;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
     cursor: pointer;
+    backdrop-filter: blur(4px);
   }
   .btn:active { transform: scale(0.96); }
   .combo-hud {
-    margin-top: 16px;
-    color: #fff; font-size: 13px; opacity: 0.7;
+    margin-top: 12px;
+    color: #fff; font-size: 13px; opacity: 0.85;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
 </style>
 </head>
 <body>
   <div class="stage">
-    <div class="character" id="char"></div>
+    <div class="char-wrap">
+      <div class="char-shadow" id="shadow"></div>
+      <div class="character" id="char"></div>
+    </div>
     <button class="btn" id="atkBtn">⚔ 攻击 (空格)</button>
     <div class="combo-hud" id="combo">连击: 0</div>
     <div class="hint">按 [空格] 或 [J] 攻击<br>连续攻击从第 2 帧开始循环</div>
@@ -63,7 +90,7 @@
 
 <script>
 (function(){
-  const SPRITE = 'sprite_6frames.jpg';
+  const SPRITE = 'sprite_6frames.png';
 
   // 6 帧在精灵图中的位置（3 列 x 2 行，行优先，帧序 1~6 = 左上→右上→左下→右下）
   const POSITIONS = [
@@ -93,6 +120,7 @@
   const charEl = document.getElementById('char');
   const btnEl  = document.getElementById('atkBtn');
   const comboEl = document.getElementById('combo');
+  const shadowEl = document.getElementById('shadow');
 
   let timers = [];
   let firstAttack = true;
@@ -107,6 +135,11 @@
     charEl.style.backgroundPosition = POSITIONS[n - 1];
   }
 
+  // 攻击时阴影动态变化
+  function pulseShadow(scale) {
+    shadowEl.style.transform = `scale(${scale})`;
+  }
+
   function playAttack() {
     clearTimers();
     combo++;
@@ -116,6 +149,7 @@
     firstAttack = false;
 
     showFrame(seq[0].idx);
+    pulseShadow(0.85);  // 蓄力时阴影缩小
 
     let acc = 0;
     for (let i = 0; i < seq.length; i++) {
@@ -123,6 +157,12 @@
       const t = setTimeout(() => {
         if (i + 1 < seq.length) {
           showFrame(seq[i + 1].idx);
+          // 挥剑命中时阴影放大
+          if (seq[i+1].idx === 3 || seq[i+1].idx === 4) {
+            pulseShadow(1.2);
+          } else {
+            pulseShadow(1.0);
+          }
         }
       }, acc);
       timers.push(t);
@@ -130,6 +170,7 @@
 
     const endT = setTimeout(() => {
       showFrame(1);
+      pulseShadow(1.0);
     }, acc + 50);
     timers.push(endT);
   }
